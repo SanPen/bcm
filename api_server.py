@@ -6,6 +6,7 @@ from uuid import uuid4
 from flask import Flask, jsonify, request
 
 from blockchain import BlockChain
+from market_pool import Market
 
 PORT = 5000
 
@@ -18,6 +19,9 @@ node_identifier = str(uuid4()).replace('-', '')
 
 # Instantiate the Block chain
 block_chain = BlockChain()
+
+# Instantiate the Market
+market = Market(block_chain)
 
 
 @app.route('/mine', methods=['GET'])
@@ -58,15 +62,16 @@ def mine():
     return jsonify(response), 200
 
 
-@app.route('/transactions/new', methods=['POST'])
-def new_transaction():
+@app.route('/transactions/add_offer', methods=['POST'])
+def add_offer():
     """
     This is what the request for a transaction will look like. It’s what the user sends to the server:
 
         {
-         "sender": "my address",
-         "recipient": "someone else's address",
-         "amount": 5
+         "seller": "ip address / hashed address, etc",
+         "minimum": 0,
+         "maximum": 5,
+         "price": 20.4
         }
 
     Since we already have our class method for adding transactions to a block, the rest is easy.
@@ -75,14 +80,47 @@ def new_transaction():
     values = request.get_json()
 
     # Check that the required fields are in the POST'ed data
-    required = ['sender', 'recipient', 'amount']
+    required = ['seller', 'minimum', 'maximum', 'price']
     if not all(k in values for k in required):
         return 'Missing values', 400
 
     # Create a new Transaction
-    index = block_chain.new_transaction(values['sender'], values['recipient'], values['amount'])
+    index = market.add_offer(seller=values['sender'],
+                             minimum=values['minimum'],
+                             maximum=values['maximum'],
+                             price=values['price'])
 
-    response = {'message': f'Transaction will be added to Block {index}'}
+    response = {'message': f'Offer added at market index {index}'}
+    return jsonify(response), 201
+
+
+@app.route('/transactions/buy', methods=['POST'])
+def buy():
+    """
+    This is what the request for a transaction will look like. It’s what the user sends to the server:
+
+        {
+         "buyer": "ip address / hashed address, etc",
+         "amount": 3,
+         "offer_idx": 25
+        }
+
+    Since we already have our class method for adding transactions to a block, the rest is easy.
+    :return: response in json, 201
+    """
+    values = request.get_json()
+
+    # Check that the required fields are in the POST'ed data
+    required = ['buyer', 'amount', 'offer_idx']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+
+    # Create a new Transaction
+    block_chain_index, delete_offer = market.buy_from_offer(buyer=values['buyer'],
+                                                            amount=values['amount'],
+                                                            offer_idx=values['offer_idx'])
+
+    response = {'message': f'Offer added at block chain index {block_chain_index}'}
     return jsonify(response), 201
 
 
@@ -119,13 +157,25 @@ def register_nodes():
     """
     values = request.get_json()
 
+    print('Received data:', values)
+
+    # Check that the required fields are in the POST'ed data
+    required = ['nodes']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+
+    # check the list of nodes is not None
     nodes = values.get('nodes')
+
+    print(nodes)
     if nodes is None:
         return "Error: Please supply a valid list of nodes", 400
 
+    # register the nodes
     for node in nodes:
         block_chain.register_node(node)
 
+    # return the response
     response = {
         'message': 'New nodes have been added',
         'total_nodes': list(block_chain.nodes),

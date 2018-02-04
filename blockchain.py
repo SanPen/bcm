@@ -27,6 +27,7 @@ block = {
             'sender': "8527147fe1f5426f9dd545de4b27ee00",
             'recipient': "a77f5cdfa2934df3954a5c7c7da5df1f",
             'amount': 5,
+            'price': 20.3,
         }
     ],
     'proof': 324984774000,
@@ -148,18 +149,20 @@ class BlockChain:
         self.chain.append(block)
         return block
 
-    def new_transaction(self, sender, recipient, amount):
+    def new_transaction(self, sender, recipient, amount, price):
         """
         Creates a new transaction to go into the next mined Block
         :param sender: Address of the Sender
         :param recipient: Address of the Recipient
         :param amount: Amount
+        :param price: price per unit of amount
         :return: The index of the Block that will hold this transaction
         """
         self.current_transactions.append({
             'sender': sender,
             'recipient': recipient,
             'amount': amount,
+            'price': price,
         })
 
         return self.last_block['index'] + 1
